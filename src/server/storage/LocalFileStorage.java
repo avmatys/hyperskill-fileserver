@@ -5,7 +5,7 @@ import java.util.*;
 public class LocalFileStorage implements FileStorage {
     
     private static int MAX_SIZE = 10;
-    private Map<String, FileData> storage;
+    private Map<String, byte[]> storage;
 
     private static final Set<String> VALID_FILES = new HashSet<>(Arrays.asList(
             "file1", "file2", "file3", "file4", "file5",
@@ -17,7 +17,7 @@ public class LocalFileStorage implements FileStorage {
     }
 
     @Override 
-    public boolean add(String filename, FileData data) {
+    public boolean add(String filename, byte[] data) {
         Objects.requireNonNull(filename, "Filename must be non null");
         Objects.requireNonNull(data, "FileData must be non null");
         if (this.storage.containsKey(filename) || this.storage.size() >= MAX_SIZE || !VALID_FILES.contains(filename))
@@ -27,9 +27,9 @@ public class LocalFileStorage implements FileStorage {
     }
 
     @Override 
-    public Optional<FileData> get(String filename) {
+    public byte[] get(String filename) {
         Objects.requireNonNull(filename, "Filename must be non null");
-        return Optional.ofNullable(this.storage.get(filename));
+        return this.storage.get(filename);
     }
     
     @Override
