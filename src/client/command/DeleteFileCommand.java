@@ -1,20 +1,18 @@
 package client.command;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.net.Socket;
 import java.util.Base64;
 import java.util.Scanner;
 
 public class DeleteFileCommand implements Command {
 
-    private final PrintWriter out;
-    private final BufferedReader in;
+    private final DataOutputStream out;
+    private final DataInputStream in;
     private final Scanner scanner;
 
-    public DeleteFileCommand(PrintWriter out, BufferedReader in, Scanner scanner) {
+    public DeleteFileCommand(DataOutputStream out, DataInputStream in, Scanner scanner) {
         this.out = out;
         this.in = in;
         this.scanner = scanner;
@@ -22,14 +20,21 @@ public class DeleteFileCommand implements Command {
 
     @Override
     public void execute() throws IOException {
-        System.out.print("Enter filename: ");
-        String filename = scanner.nextLine().trim();
-        out.println("DELETE " + filename);
-        System.out.println("The request was sent.");
-        String serverResponse = in.readLine();
+        System.out.print("Do you want to delete file by name or by id (1 - name, 2 - id): ");
+        String type = scanner.nextLine().trim();
+        if (!"1".equals(type) && !"2".equals(type)) 
+            return;
 
-        int deleteStatusCode = Integer.parseInt(serverResponse);
-        switch (deleteStatusCode) {
+        System.out.print("\nEnter " + "1".equalt(type) ? "name" : "id");
+        String filename = scanner.nextLine().trim();
+        out.writeUTF("DELETE");
+        out.writeUTF(type);
+        out.writeUTF(filename);
+        out.flush();
+        System.out.println("The request was sent.");
+        
+        int statusCode = in.readInt();
+        switch (statusCode) {
             case 200:
                 System.out.println("The response says that file was successfully deleted!");
                 break;

@@ -1,39 +1,65 @@
 package client.command;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.net.Socket;
-import java.util.Base64;
+import java.io.DataOutputStream;
+import java.io.DataInputStream;
 import java.util.Scanner;
 
 public class PutFileCommand implements Command {
 
-    private final PrintWriter out;
-    private final BufferedReader in;
+    private static final String PATH = "src/client/data";
+    private final DataOutputStream out;
+    private final DataInputStream in;
     private final Scanner scanner;
+    private final Path dir;
 
-    public PutFileCommand(PrintWriter out, BufferedReader in, Scanner scanner) {
+    public PutFileCommand(DataOutputStream out, DataInputStream in, Scanner scanner) {
         this.out = out;
         this.in = in;
         this.scanner = scanner;
+        this.initDir();
+    }
+
+    private void initDir() {
+        this.dir = Paths.get(PATH);
+        if (Files.notExists(this.dir)) {
+            Files.createDirectories(this.dir);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Client folder can'be opened due to the IO exception");
+        }
     }
 
     @Override
     public void execute() throws IOException {
         System.out.print("Enter filename: ");
         String filename = scanner.nextLine().trim();
-        System.out.print("Enter file content: ");
-        String content = scanner.nextLine();
 
-        String base64ContentForPut = Base64.getEncoder().encodeToString(content.getBytes());
-        out.println("PUT " + filename + " " + base64ContentForPut);
+        Path file = this.dir.resolve(filename);
+        if (!Files.exists(file)) return;
+
+        System.out.print("\nEnter name of the file to be saved on server: ");
+        String serverFilename = scanner.nextLine().trim();
+        serverFilename = serverFilename.isEmpty() ? filename : serverFilename;
+        
+        long fileSize = Files.size(file);
+        out.writeUTF("PUT");
+        out.writeUTF(serverFilename);
+        out.writeLong(fileSize);
+        
+        try (InputStream fis = Files.newInputStream(file)) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while((bytesRead = fis.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+        }
+        out.flush();
+
         System.out.println("The request was sent.");
-        String serverResponse = in.readLine();
 
-        int putStatusCode = Integer.parseInt(serverResponse);
-        switch (putStatusCode) {
+        int statusCode = in.readInt();
+        switch (statusCode) {
             case 200:
                 System.out.println("The response says that file was successfully created!");
                 break;
