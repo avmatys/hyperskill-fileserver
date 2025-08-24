@@ -2,10 +2,8 @@ package server.controller;
 
 import java.net.Socket;
 import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.util.Base64;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 
 public class ClientHandler implements Runnable {
 
@@ -19,39 +17,27 @@ public class ClientHandler implements Runnable {
 
     @Override
     public void run() {
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+        try (DataInputStream in = new DataInputStream(socket.getInputStream());
+             DataOutputStream out = new DataOutputStream(socket.getOutputStream())) {
 
-            String command;
-            while ((command = in.readLine()) != null) {
-                String[] parts = command.split(" ", 3);
-                command = parts[0].toUpperCase();
+            String command = in.readUTF();
+            if ("EXIT".equals(command)) {
+                server.Main.stop();
+                return;
+            }
 
-                if ("EXIT".equals(command)) {
-                    server.Main.stop();
-                    break; 
-                }
-
-                switch (command) {
-                    case "PUT":
-                        if (parts.length >= 2) {
-                            byte[] data = Base64.getDecoder().decode(parts[2]);
-                            out.println(controller.upload(parts[1], data)); 
-                        } 
-                        break;
-                    case "GET":
-                        if (parts.length >= 2) {
-                            out.println(controller.download(parts[1]));
-                        }
-                        break;
-                    case "DELETE":
-                        if (parts.length >= 2) {
-                            out.println(controller.delete(parts[1]));
-                        } 
-                        break;
-                    default:
-                        break;
-                }
+            switch (command) {
+                case "PUT" : 
+                    this.handleUpload(in, out);
+                    break
+                case "GET" : 
+                    this.handleDownload(in, out);
+                    break;
+                case "DELETE" : 
+                    this.handleDelete(in, out);
+                    break;
+                default:
+                    out.writeInt(400);
             }
         } catch (IOException e) {
            System.err.println("Client handler error: " + e.getMessage());
@@ -63,4 +49,50 @@ public class ClientHandler implements Runnable {
             }
         }
      }
+
+    private void handleUpload(DataInputStream in, DataOutputStream out) {
+        try {
+            String filename = in.readUTF();
+            long size = in.readLong();
+            if (controller.existsByFilename(filename) {
+                out.writeInt(403);
+                return;
+            }
+            String id = controller.upload(filename, size, in);
+            if (id != null) {
+                out.writeInt(200);
+                out.writeUTF(id);
+                return;
+            }
+            out.writeInt(500);
+        } catch (IOException e) {
+            out.writeInt(500);
+            throw new RuntimeException("IO exception during PUT operation");
+        }
+    }
+
+    private void handleDelete(DataInputStream in, DataOutputStream out) {
+        try {
+            int type = in.readInt();
+            String value = in.readUTF();
+            if (type != 1 && type != 2) {
+                out.writeInt(400);
+                return;
+            }
+            if (!(type == 1 ? controller.existsByFilename(value) : controller.existsById(value))) {
+                out.write(404);
+                return;
+            }
+            if (type == 1 ? controller.deleteByFilename(value) : controller.deleteById(value)) {
+                out.writeInt(200);
+                return;
+            }
+            out.writeInt(500);
+        } catch (IOException e) {
+            out.write(500);
+            throw new RuntimeException("IO exception during DELETE operation");
+        }
+    }
+
+
 }

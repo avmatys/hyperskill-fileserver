@@ -32,7 +32,7 @@ public class PutFileCommand implements Command {
 
     @Override
     public void execute() throws IOException {
-        System.out.print("Enter filename: ");
+        System.out.print("Enter name of the file: ");
         String filename = scanner.nextLine().trim();
 
         Path file = this.dir.resolve(filename);
@@ -61,7 +61,8 @@ public class PutFileCommand implements Command {
         int statusCode = in.readInt();
         switch (statusCode) {
             case 200:
-                System.out.println("The response says that file was successfully created!");
+                int fileId = in.readInt();
+                System.out.println("The response says that file is saved! ID = " + fileId);
                 break;
             case 403:
                 System.out.println("The response says that creating of file was forbidden!");

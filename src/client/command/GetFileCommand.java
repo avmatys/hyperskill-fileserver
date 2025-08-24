@@ -49,7 +49,7 @@ public class GetFileCommand implements Command {
         int statusCode = in.readInt();
         switch (getStatusCode) {
             case 200:
-                System.out.print("\nThe file was downloaded!Specify a name for it:");
+                System.out.print("\nThe file was downloaded! Specify a name for it:");
                 String saveFilename = Scanner.nextLine().trim();
                 long saveSize = in.readLong();
                 Path savePath = this.dir.resolve(saveFilename);
