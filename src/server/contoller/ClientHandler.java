@@ -67,7 +67,6 @@ public class ClientHandler implements Runnable {
             out.writeInt(500);
         } catch (IOException e) {
             out.writeInt(500);
-            throw new RuntimeException("IO exception during PUT operation");
         }
     }
 
@@ -79,20 +78,43 @@ public class ClientHandler implements Runnable {
                 out.writeInt(400);
                 return;
             }
-            if (!(type == 1 ? controller.existsByFilename(value) : controller.existsById(value))) {
-                out.write(404);
+            String id = type == 1 ? controller.getIdByFilename(value) : value;
+            if (id == null || !controller.exists(id)) {
+                out.writeInt(404);
                 return;
             }
-            if (type == 1 ? controller.deleteByFilename(value) : controller.deleteById(value)) {
+            if (controller.delete(id)) {
                 out.writeInt(200);
                 return;
             }
             out.writeInt(500);
         } catch (IOException e) {
             out.write(500);
-            throw new RuntimeException("IO exception during DELETE operation");
         }
     }
 
+    private void handleDownload(DataInputStream in, DataOutputStream out) {
+        try {
+            int type = in.readInt();
+            if (type != 1 && type != 2) {
+                out.writeInt(400);
+                return;
+            }
+            String id = type == 1 ? controller.getIdByFilename(value) : value;
+            if (id == null || !controller.exists(id)) {
+                out.writeInt(404);
+                return;
+            }
+            Runnable action = controller.download(id, out);
+            if (action == null) {
+                out.writeInt(500);
+            } else {
+                out.writeInt(200);
+                action.run();
+            }
+        } catch(IOException) {
+            out.write(500);
+        }
+    }
 
 }

@@ -77,12 +77,13 @@ public class FileController {
         }
     }
 
-    public boolean existsById(String id) {
-        return metadata.idToFilename.containsKey(id);
+    public String getIdByFilename(String filename) {
+        Objects.requireNonNull(filename, "Filename can't be null");
+        return metadata.filenameToId.getOrDefault(filename, null);
     }
 
-    public boolean existsByFilename(String filename) {
-        return metadata.filenameToId.containsKey(filename);
+    public boolean exists(String id) {
+        return metadata.idToFilename.containsKey(id);
     }
 
     public String upload(String filename, long size, InputStream in) throws IOException {
@@ -102,35 +103,28 @@ public class FileController {
         }
     }
 
-    public FileResponse delete(String filename) {
-        if (!this.storage.exists(filename)) {
-            return new FileResponse(404);
+    public boolean delete(String id) throws IOException {
+        if (!acquireLock(id)) return false;
+        try {
+            if (!this.storage.exists(id)) return false;
+            return this.storage.delete(id);
+        } finally {
+            releaseLock(id);
         }
-        if (this.storage.delete(filename)) {
-            return new FileResponse(200);
-        }
-        return new FileResponse(500);
     }
 
-    public FileResponse downloadById(String id, OutputStream out) {
-        if (!this.storage.exists(id)) return new FileResponse(404);
-    }
-
-    public FileResponse downloadByName(String filename,OutputStream out) {
-        String id = this.metadata.filenameToId.get(filename);
-        if (id == null || !this.storage.exists(id)) return new FileResponse(404);
-        return this.downloadById(id, out);
-    }
-
-    public FileResponse download(String filename) {
-        if (!this.storage.exists(filename)) {
-            return new FileResponse(404);
+    public Runnable download(String id, OutputStream out) throws IOException {
+        if (!acquireLock(id)) return null;
+        if (!this.storage.exists(filename)) return null;
+        return () -> {
+            try {
+                this.storage.download(id, out);
+            } catch(IOException) {
+                throw new RuntimeException("File can't be downloaded");
+            } finally {
+                releaseLock(id);
+            }
         }
-        byte[] data = this.storage.get(filename);
-        if (data.length > 0) {
-            return new FileResponse(200, data);
-        }
-        return new FileResponse(500);
     }
 
 }
