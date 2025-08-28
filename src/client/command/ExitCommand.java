@@ -1,19 +1,19 @@
 package client.command;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
 
 public class ExitCommand implements Command {
 
-    private final PrintWriter out;
+    private final DataOutputStream  out;
 
-    public ExitCommand(PrintWriter out) {
+    public ExitCommand(DataOutputStream out) {
         this.out = out;
     }
 
     @Override
     public void execute() throws IOException {
-        out.println("EXIT");
+        out.writeUTF("EXIT");
         System.out.println("The request was sent.");
     }
 }

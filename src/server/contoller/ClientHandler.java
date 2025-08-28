@@ -1,35 +1,39 @@
-package server.controller;
+package server.contoller;
 
-import java.net.Socket;
-import java.io.IOException;
+import server.Server;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
 
 public class ClientHandler implements Runnable {
 
     private final Socket socket;
     private final FileController controller;
+    private final Server server;
 
-    public ClientHandler(Socket socket, FileController controller) {
+    public ClientHandler(Socket socket, FileController controller, Server server) {
        this.socket = socket;
        this.controller = controller;
+       this.server = server;
     }
 
     @Override
-    public void run() {
+    public void run()  {
         try (DataInputStream in = new DataInputStream(socket.getInputStream());
              DataOutputStream out = new DataOutputStream(socket.getOutputStream())) {
 
             String command = in.readUTF();
             if ("EXIT".equals(command)) {
-                server.Main.stop();
+                this.server.shutdown();
                 return;
             }
 
             switch (command) {
                 case "PUT" : 
                     this.handleUpload(in, out);
-                    break
+                    break;
                 case "GET" : 
                     this.handleDownload(in, out);
                     break;
@@ -43,18 +47,20 @@ public class ClientHandler implements Runnable {
            System.err.println("Client handler error: " + e.getMessage());
         } finally {
             try {
-                socket.close();
+                if (!socket.isClosed()) {
+                    socket.close();
+                }
             } catch (IOException e) {
                 System.err.println("Error closing socket: " + e.getMessage());
             }
         }
      }
 
-    private void handleUpload(DataInputStream in, DataOutputStream out) {
+    private void handleUpload(DataInputStream in, DataOutputStream out) throws IOException {
         try {
             String filename = in.readUTF();
             long size = in.readLong();
-            if (controller.existsByFilename(filename) {
+            if (controller.existsByFilename(filename)) {
                 out.writeInt(403);
                 return;
             }
@@ -70,7 +76,7 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleDelete(DataInputStream in, DataOutputStream out) {
+    private void handleDelete(DataInputStream in, DataOutputStream out) throws IOException {
         try {
             int type = in.readInt();
             String value = in.readUTF();
@@ -78,42 +84,47 @@ public class ClientHandler implements Runnable {
                 out.writeInt(400);
                 return;
             }
-            String id = type == 1 ? controller.getIdByFilename(value) : value;
-            if (id == null || !controller.exists(id)) {
+            String filename = type == 1 ? value : controller.getFilenameById(value);
+            if (filename == null || !controller.existsByFilename(filename)) {
                 out.writeInt(404);
                 return;
             }
-            if (controller.delete(id)) {
+            if (controller.delete(filename)) {
                 out.writeInt(200);
                 return;
             }
             out.writeInt(500);
         } catch (IOException e) {
-            out.write(500);
+            out.writeInt(500);
         }
     }
 
-    private void handleDownload(DataInputStream in, DataOutputStream out) {
+    private void handleDownload(DataInputStream in, DataOutputStream out) throws IOException {
         try {
             int type = in.readInt();
             if (type != 1 && type != 2) {
                 out.writeInt(400);
                 return;
             }
-            String id = type == 1 ? controller.getIdByFilename(value) : value;
-            if (id == null || !controller.exists(id)) {
+            String value = in.readUTF();
+            System.out.println(value);
+            String filename = type == 1 ? value : controller.getFilenameById(value);
+            System.out.println(filename);
+            if (filename == null || !controller.existsByFilename(filename)) {
                 out.writeInt(404);
                 return;
             }
-            Runnable action = controller.download(id, out);
+            long size = controller.size(filename);
+            Runnable action = controller.download(filename, out);
             if (action == null) {
                 out.writeInt(500);
             } else {
                 out.writeInt(200);
+                out.writeLong(size);
                 action.run();
             }
-        } catch(IOException) {
-            out.write(500);
+        } catch(IOException e) {
+            out.writeInt(500);
         }
     }
 

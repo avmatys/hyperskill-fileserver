@@ -1,8 +1,12 @@
 package client.command;
 
-import java.io.IOException;
-import java.io.DataOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class PutFileCommand implements Command {
@@ -13,21 +17,13 @@ public class PutFileCommand implements Command {
     private final Scanner scanner;
     private final Path dir;
 
-    public PutFileCommand(DataOutputStream out, DataInputStream in, Scanner scanner) {
+    public PutFileCommand(DataOutputStream out, DataInputStream in, Scanner scanner) throws IOException {
         this.out = out;
         this.in = in;
         this.scanner = scanner;
-        this.initDir();
-    }
-
-    private void initDir() {
         this.dir = Paths.get(PATH);
-        if (Files.notExists(this.dir)) {
+        if (Files.notExists(this.dir))
             Files.createDirectories(this.dir);
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Client folder can'be opened due to the IO exception");
-        }
     }
 
     @Override
@@ -36,17 +32,20 @@ public class PutFileCommand implements Command {
         String filename = scanner.nextLine().trim();
 
         Path file = this.dir.resolve(filename);
-        if (!Files.exists(file)) return;
+        if (!Files.exists(file)) {
+            System.err.println("Error: File '" + filename + "' does not exist in '" + PATH + "'.");
+            return;
+        }
 
         System.out.print("\nEnter name of the file to be saved on server: ");
         String serverFilename = scanner.nextLine().trim();
         serverFilename = serverFilename.isEmpty() ? filename : serverFilename;
-        
+
         long fileSize = Files.size(file);
         out.writeUTF("PUT");
         out.writeUTF(serverFilename);
         out.writeLong(fileSize);
-        
+
         try (InputStream fis = Files.newInputStream(file)) {
             byte[] buffer = new byte[4096];
             int bytesRead;
@@ -61,8 +60,8 @@ public class PutFileCommand implements Command {
         int statusCode = in.readInt();
         switch (statusCode) {
             case 200:
-                int fileId = in.readInt();
-                System.out.println("The response says that file is saved! ID = " + fileId);
+                String fileId = in.readUTF();
+                System.out.println("Response says that file is saved! ID = " + fileId);
                 break;
             case 403:
                 System.out.println("The response says that creating of file was forbidden!");
@@ -71,7 +70,7 @@ public class PutFileCommand implements Command {
                 System.out.println("The response says that internal server error happened!");
                 break;
             default:
-                System.out.println("The response says that " + serverResponse);
+                System.out.println("No response");
                 break;
         }
     }
